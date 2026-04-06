@@ -2,6 +2,12 @@
 
 > [!NOTE]
 > This service is currently **deployed and running correctly**. This documentation is for reference only or for future infrastructure updates. New team members should refer to the [ADK Agent Guide](./adk_agent_guide.md) for integration.
+## Running Locally
+#Prereq:
+pip install -r requirements.txt
+source venv/bin/activate
+#command to run
+workspace-mcp --tools contacts gmail calendar
 
 ## Building the Image
 
