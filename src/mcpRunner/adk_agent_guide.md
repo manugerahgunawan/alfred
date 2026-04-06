@@ -8,7 +8,7 @@ This guide shows how to wire your **Google ADK (Agent Development Kit)** agent s
 
 ## How It Works
 
-```
+```text
 Your ADK Agent
     │
     ▼  (StreamableHTTPConnectionParams)
@@ -144,7 +144,7 @@ async def build_agent_for_user(user_access_token: str):
 Once connected, ADK will automatically discover these tools from the server:
 
 | Tool Name | Description |
-|-----------|-------------|
+| :--- | :--- |
 | `search_gmail_messages` | Search inbox with a Gmail query string |
 | `get_gmail_message` | Get a specific message by ID |
 | `send_gmail_message` | Draft and send an email |
@@ -152,6 +152,7 @@ Once connected, ADK will automatically discover these tools from the server:
 | `create_event` | Create a new calendar event |
 | `search_contacts` | Search Google Contacts |
 | `get_contact` | Get a specific contact |
+| `manage_event` | Create, update, or delete calendar events |
 
 > The full list is auto-fetched at runtime — run `tools/list` via `mcp_google_client.py` to see the latest.
 
@@ -161,6 +162,7 @@ Once connected, ADK will automatically discover these tools from the server:
 
 Google access tokens expire after **1 hour**. For long-running agents:
 - Re-run `get_token.py` to refresh your token before starting the agent, OR
+
 - Implement a token refresh loop using the `refresh_token` from the OAuth response
 
 ---

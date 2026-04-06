@@ -4,6 +4,9 @@ Connect to the hosted Google Workspace MCP server and call Gmail, Calendar, and 
 
 **Hosted MCP Server:** `https://workspace-mcp-181562945855.asia-southeast2.run.app/`
 
+> [!IMPORTANT]
+> **Team Note:** The MCP service is already deployed and running. You **do not** need to build or deploy anything. Your focus is strictly on integrating your agents using the [ADK Agent Guide](./adk_agent_guide.md).
+
 ---
 
 ## Prerequisites
@@ -51,6 +54,7 @@ python get_token.py
 ```
 
 This will:
+
 1. Open a browser tab → authorize with your Google account
 2. Exchange the code for an access token
 3. **Automatically write** `GOOGLE_ACCESS_TOKEN=...` into your root `.env`
@@ -76,11 +80,12 @@ Step 4: Testing Calendar...
 ## File Reference
 
 | File | Purpose |
-|------|---------|
+| :--- | :--- |
 | `get_token.py` | OAuth flow — opens browser, saves token to `.env` |
 | `mcp_google_client.py` | Reusable async MCP client class |
 | `test_mcp_multiuser.py` | End-to-end test: lists tools + calls Gmail/Contacts/Calendar |
 | `requirements.txt` | Python dependencies (`httpx`, `python-dotenv`) |
+| `adk_agent_guide.md` | Guide for Google ADK Agent integration |
 
 ---
 
