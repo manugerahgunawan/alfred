@@ -42,16 +42,17 @@ async def test_mcp_flow():
         print("\nStep 1: Listing Tools (Verifying Auth)...")
         tools = await client.list_tools()
         tool_names = [t['name'] for t in tools]
-        print(f"Success! Found {len(tools)} tools.")
+        print(f"Success! Found {len(tools)} tools.\n")
         
         # 2. Test Gmail (Search unread messages)
         if "search_gmail_messages" in tool_names:
             print("\nStep 2: Testing Gmail (Searching unread)...")
             gmail_results = await client.call_tool("search_gmail_messages", {
-                "query": "is:unread",
-                "max_results": 2
+                "query": "is:unread"
             })
-            print(f"Gmail Results: {gmail_results}")
+            # Limit the output string length to keep console clean
+            out_str = str(gmail_results)
+            print(f"Gmail Results (truncated): {out_str[:300]}...\n")
         else:
             print("\nStep 2: Gmail tool not found in current tier.")
 
@@ -61,7 +62,8 @@ async def test_mcp_flow():
             contact_results = await client.call_tool("search_contacts", {
                 "query": "test"
             })
-            print(f"Contacts Results: {contact_results}")
+            out_str = str(contact_results)
+            print(f"Contacts Results: {out_str[:300]}...\n")
         else:
             print("\nStep 3: Contacts tool not found.")
 
@@ -69,12 +71,32 @@ async def test_mcp_flow():
         if "get_events" in tool_names:
             print("\nStep 4: Testing Calendar (Getting events)...")
             calendar_results = await client.call_tool("get_events", {
-                "calendar_id": "primary",
-                "max_results": 2
+                "calendar_id": "primary"
             })
-            print(f"Calendar Results: {calendar_results}")
+            out_str = str(calendar_results)
+            print(f"Calendar Results: {out_str[:300]}...\n")
         else:
-            print("\nStep 4: Calendar tool not found.")
+            print("\nStep 4: Calendar tool get_events not found.")
+
+        # 5. Test Calendar (Create event) 
+        if "manage_event" in tool_names:
+            from datetime import datetime, timedelta, timezone
+            now = datetime.now(timezone.utc)
+            start_time = (now + timedelta(minutes=5)).isoformat()
+            end_time = (now + timedelta(minutes=35)).isoformat()
+            
+            print("\nStep 5: Testing Calendar (Creating test event)...")
+            create_results = await client.call_tool("manage_event", {
+                "action": "create",
+                "summary": "MCP Test Event",
+                "description": "This is a test event created by MCP",
+                "start": start_time,
+                "end": end_time
+            })
+            out_str = str(create_results)
+            print(f"Calendar Create Results: {out_str[:300]}...\n")
+        else:
+            print("\nStep 5: Calendar tool create_event not found.")
 
     except Exception as e:
         print(f"\nError occurred: {e}")
