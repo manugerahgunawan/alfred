@@ -70,7 +70,7 @@ def assess_household_conflicts(tool_context: ToolContext, intent: str) -> dict:
 
 def update_household_ledger(tool_context: ToolContext, action: str) -> dict:
     """Logs agent actions to the Firestore audit trail."""
-    logging.info(f"[Audit Trail] Action recorded: {action}")
+    logging.info(f"[Audit Trail] Action recorded: {actgit pion}")
     try:
         db.collection("agentActions").add({
             "action": action,
