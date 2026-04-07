@@ -11,3 +11,12 @@ coverage/
 __pycache__/
 *.pyc
 *.pyo
+
+# ADK and Agent state
+.adk/
+agent_logs/
+node_modules/
+
+# Database files
+session.db
+*.db
