@@ -24,8 +24,9 @@ COPY --chown=myuser:myuser alfred_agent/ /app/agents/alfred_agent/
 EXPOSE 8080
 
 # Run ADK web server with Firestore session persistence
+# Cloud Run injects PORT env var (default 8000); we must listen on it
 CMD adk web \
-	--port=8080 \
+	--port=${PORT:-8080} \
 	--host=0.0.0.0 \
 	--session_service_uri=firestore://${GOOGLE_CLOUD_PROJECT:-alfred-492407} \
 	"/app/agents"
