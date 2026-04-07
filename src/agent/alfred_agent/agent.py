@@ -6,7 +6,11 @@ from dotenv import load_dotenv
 from google.adk import Agent
 from google.adk.agents import SequentialAgent
 from google.adk.tools.tool_context import ToolContext
+from google.cloud import firestore
+from datetime import datetime, timezone
 
+# Initialize Firestore client (ADC handles auth automatically on Cloud Run)
+db = firestore.Client(project=os.getenv("GOOGLE_CLOUD_PROJECT", "alfred-492407"))
 # --- Setup Logging and Environment ---
 cloud_logging_client = google.cloud.logging.Client()
 cloud_logging_client.setup_logging()
@@ -23,12 +27,33 @@ def assess_household_conflicts(tool_context: ToolContext, intent: str) -> dict:
     
     # Simulating the 'Household Graph' persistence mentioned in the README
     tool_context.state["CURRENT_INTENT"] = intent
+    # Read household context from Firestore
+    try:
+        household_ref = db.collection("households").document("default")
+        household = household_ref.get()
+        if household.exists:
+            logging.info(f"[Firestore] Household context loaded: {household.to_dict()}")
+    except Exception as e:
+        logging.warning(f"[Firestore] Could not load household: {e}")
+    
+
     return {"status": "Analysis complete. Potential overlap detected in Thursday's schedule."}
 
 def update_household_ledger(tool_context: ToolContext, action: str) -> dict:
     """Logs agent actions to the Firestore audit trail."""
     logging.info(f"[Audit Trail] Action recorded: {action}")
-    return {"status": "Logged to Firestore"}
+    try:
+        db.collection("agentActions").add({
+            "action": action,
+            "agent": tool_context.agent_name if hasattr(tool_context, 'agent_name') else "unknown",
+            "intent": tool_context.state.get("CURRENT_INTENT", ""),
+            "timestamp": datetime.now(timezone.utc),
+        })
+        logging.info("[Firestore] Action logged successfully")
+        return {"status": "Logged to Firestore"}
+    except Exception as e:
+        logging.error(f"[Firestore] Failed to log: {e}")
+        return {"status": f"Firestore error: {str(e)}"}
 
 # --- Agent Definitions ---
 
