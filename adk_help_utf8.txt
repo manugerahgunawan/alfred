@@ -1,0 +1,61 @@
+﻿Usage: adk web [OPTIONS] [AGENTS_DIR]
+
+  Starts a FastAPI server with Web UI for agents.
+
+  AGENTS_DIR: The directory of agents, where each sub-directory is a single
+  agent, containing at least `__init__.py` and `agent.py` files.
+
+  Example:
+
+    adk web --session_service_uri=[uri] --port=[port] path/to/agents_dir
+
+Options:
+  --host TEXT                     Optional. The binding host of the server
+                                  [default: 127.0.0.1]
+  --port INTEGER                  Optional. The port of the server
+  --allow_origins TEXT            Optional. Any additional origins to allow
+                                  for CORS.
+  -v, --verbose                   Enable verbose (DEBUG) logging. Shortcut for
+                                  --log_level DEBUG.
+  --log_level [debug|info|warning|error|critical]
+                                  Optional. Set the logging level
+  --trace_to_cloud                Optional. Whether to enable cloud trace for
+                                  telemetry.
+  --reload / --no-reload          Optional. Whether to enable auto reload for
+                                  server. Not supported for Cloud Run.
+  --a2a                           Optional. Whether to enable A2A endpoint.
+  --reload_agents                 Optional. Whether to enable live reload for
+                                  agents changes.
+  --eval_storage_uri TEXT         Optional. The evals storage URI to store
+                                  agent evals, supported URIs: gs://<bucket
+                                  name>.
+  --session_service_uri TEXT      Optional. The URI of the session service. -
+                                  Use 'agentengine://<agent_engine>' to
+                                  connect to Agent Engine   sessions.
+                                  <agent_engine> can either be the full
+                                  qualified resource   name
+                                  'projects/abc/locations/us-
+                                  central1/reasoningEngines/123' or   the
+                                  resource id '123'. - Use
+                                  'sqlite://<path_to_sqlite_file>' to connect
+                                  to a SQLite DB. - See https://docs.sqlalchem
+                                  y.org/en/20/core/engines.html#backend-
+                                  specific-urls for more details on supported
+                                  database URIs.
+  --artifact_service_uri TEXT     Optional. The URI of the artifact service,
+                                  supported URIs: gs://<bucket name> for GCS
+                                  artifact service.
+  --memory_service_uri TEXT       Optional. The URI of the memory service. -
+                                  Use 'rag://<rag_corpus_id>' to connect to
+                                  Vertex AI Rag Memory Service. - Use
+                                  'agentengine://<agent_engine>' to connect to
+                                  Agent Engine   sessions. <agent_engine> can
+                                  either be the full qualified resource   name
+                                  'projects/abc/locations/us-
+                                  central1/reasoningEngines/123' or   the
+                                  resource id '123'.
+  --session_db_url TEXT           Deprecated. Use --session_service_uri
+                                  instead.
+  --artifact_storage_uri TEXT     Deprecated. Use --artifact_service_uri
+                                  instead.
+  --help                          Show this message and exit.

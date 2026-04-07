@@ -15,7 +15,13 @@ class MCPGoogleClient:
     """
     
     def __init__(self, base_url: str, access_token: str):
-        self.base_url = base_url.rstrip('/')
+        cleaned_url = base_url.rstrip('/')
+        if cleaned_url.endswith('/mcp'):
+            self.base_url = cleaned_url[:-4].rstrip('/')
+            self.mcp_url = cleaned_url
+        else:
+            self.base_url = cleaned_url
+            self.mcp_url = f"{self.base_url}/mcp"
         self.access_token = access_token
         self.client = httpx.AsyncClient(
             headers={
@@ -47,11 +53,11 @@ class MCPGoogleClient:
 
         # 2. Set endpoint URL
         if self.transport == "streamable-http":
-            self.post_url = f"{self.base_url}/mcp"
+            self.post_url = self.mcp_url
             logger.info(f"Using Streamable HTTP endpoint: {self.post_url}")
         else:
             # Legacy SSE fallback
-            self.post_url = f"{self.base_url}/mcp"
+            self.post_url = self.mcp_url
             logger.info(f"Defaulting to /mcp endpoint")
 
         # 3. MCP Initialization Handshake (required for streamable-http)

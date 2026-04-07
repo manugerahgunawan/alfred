@@ -62,14 +62,14 @@ Alfred needs a few "Secret Keys" to function. In this folder, you will find a fi
 MODEL=gemini-2.5-flash
 PROJECT_ID=alfred-492407
 LOCATION=us-central1
-MCP_URL=https://workspace-mcp-181562945855.asia-southeast2.run.app/mcp
+MCP_URL=https://workspace-mcp-181562945855.asia-southeast2.run.app
 GOOGLE_APPLICATION_CREDENTIALS=C:\path\to\your\credentials.json
 GOOGLE_ACCESS_TOKEN=your_temp_token_here
 ```
 
 ### ⚡ How to get your Access Token
 
-The `GOOGLE_ACCESS_TOKEN` expires every hour. To refresh it, open your terminal (Command Prompt or PowerShell) and run:
+The app now also stores a refresh token during Google sign-in, so it can mint fresh access tokens automatically. If you need to bootstrap the local `.env` file or test the MCP client manually, the `GOOGLE_ACCESS_TOKEN` still expires every hour. To refresh it yourself, open your terminal (Command Prompt or PowerShell) and run:
 
 ```powershell
 gcloud auth print-access-token
@@ -103,7 +103,7 @@ Look for any `Agent(` definition in `agent.py` and modify the `instruction` prop
 
 Alfred uses **MCP (Model Context Protocol)** to talk to the world (Gmail, Calendar, etc.).
 
-- Look for `workspace_toolset`.
+- Look for the specialist tool functions in `agent.py`.
 - You can add or remove tools by changing the `tools=[...]` list inside any agent definition.
 
 ### Create a New Specialist (Sub-Agents)
