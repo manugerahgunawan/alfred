@@ -23,7 +23,7 @@ Open your terminal (PowerShell or Command Prompt) and run these commands one at 
 1. **Clone the project**
 
    ```powershell
-   git clone https://github.com/manugerahgunawan/alfred.git
+   git clone https://github.com/luiz-ramelan/alfred.git
    ```
 
 2. **Move into the folder**
