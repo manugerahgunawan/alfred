@@ -66,7 +66,6 @@ def assess_household_conflicts(tool_context: ToolContext, intent: str) -> dict:
     except Exception as e:
         logging.warning(f"[Firestore] Could not load household: {e}")
     
-
     return {"status": "Analysis complete. Potential overlap detected in Thursday's schedule."}
 
 def update_household_ledger(tool_context: ToolContext, action: str) -> dict:
@@ -96,11 +95,12 @@ work_agent = Agent(
     You are Alfred's professional attache. Your focus is Master Wayne's professional life.
     TODAY'S DATE is {today_str}. TIMEZONE is {tz_str}.
 
-    - Strictly only return events that are professional (meetings, syncs, deadlines).
+    - Strictly only return events that are professional (keywords: meeting, presentation, call, board, conference, client, project, interview, deadline).
     - SPECIAL PROJECTS: Mentions of Gotham, Batman, or high-stakes 'midnight' meetings are to be treated as top-secret high-priority work. 
     - MIDNIGHT LOGIC: If the Master asks for 'midnight' and it is currently late in the day (after 6 PM), assume he means the midnight that starts TOMORROW.
     - MANUALLY CALCULATE the date range for any relative terms.
-    - IGNORE: Birthdays, Zumba, and simple family errands.
+    - Call `add_event` to register the event. send_gmail_message to notify the event to the contacts if it's found in search_contacts
+    - IGNORE: home/family event (keywords: dinner, lunch, breakfast, family, school, doctor, birthday, anniversary, vacation, appointment, pickup).
     """,
     tools=[workspace_toolset],
     output_key="work_context"
@@ -113,9 +113,11 @@ home_agent = Agent(
     model=model_name,
     description="Coordinates for family events, home maintenance, and deliveries.",
     instruction="""
-    You manage the family stuff and home.
-    - Track grocery lists, errands, and family appointments.
-    - ONLY use tools if the Master specifically mentions a household need (groceries, errands, family plans).
+    You manage the domestic side of Master Wayne's life.
+    - Read the conversation context for any home/family event
+       (keywords: dinner, lunch, breakfast, family, school, doctor, birthday, anniversary, vacation, appointment, pickup).
+    - Call `add_event` to register the event. send_gmail_message to notify the event to the family members if it's found in search_contacts
+    - Call `list_events` and include the home schedule in your output_key summary
     - If the current task is purely professional (work meetings, emails), DO NOT call any tools. Simply observe.
     - Do not invent 'test' entries like bread or milk.
     """,
@@ -123,7 +125,7 @@ home_agent = Agent(
     output_key="home_context"
 )
 
-# 2. Response Formatter Agent
+# 3. Response Formatter Agent
 response_formatter = Agent(
     name="response_formatter",
     model=model_name,
@@ -136,6 +138,8 @@ response_formatter = Agent(
 
     - Be dry, witty, and impeccable.
     - If a conflict between work and home was detected, explain which event took precedence and why.
+    - Once the conflict is resolved, send an email to the affected contacts to notify them of the change.
+    - manage event based on conflict resolution (update, delete, or create new event)
     - If there was NO conflict, simply provide a polished summary of the requested information.
     - Mention any actions taken (emails sent, entries made).
  
@@ -165,10 +169,17 @@ alfred_root = Agent(
 
     Your primary duty is to ensure Master can fulfill his professional duties (including Special Gotham Projects) without neglecting his family responsibilities.
 
-    1. Greet the Master with your signature dry wit.
+    1. on first contact, greet the Master with your signature dry wit. Briefly explain you can:
+    • Schedule work and home events with automatic classification and priorities.
+    • Detect and resolve scheduling conflicts automatically.
+    • Notify affected contacts by email.
     2. Strictly translate relative dates based on TODAY'S DATE ({today_str}). 
     3. Always use the provided TIMEZONE ({tz_str}) for calendar tool calls.
     4. Handle 'midnight meetings' or 'Batman-related' requests with the utmost discretion and as High-Priority Work.
+    5. If the user asks to "register a contact", "add a contact", or "save a contact", use the `add_contact` tool to store the contact details in Google Contacts.
+    6. if the user asks to create or update or delete an event, use the `manage_event` tool to create or update or delete the event in Google Calendar.
+    7. if the user asks to search for a contact, use the `search_contacts` tool to search for the contact in Google Contacts.
+    8. if the user asks to get a contact, use the `get_contact` tool to get the contact in Google Contacts.
 
     "Be present at work. Be present at home. I shall handle the rest."
     """,
