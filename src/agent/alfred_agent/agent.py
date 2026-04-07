@@ -1,11 +1,15 @@
 import os
 import logging
 import google.cloud.logging
+from datetime import date, datetime
+import time
 from dotenv import load_dotenv
 
 from google.adk import Agent
 from google.adk.agents import SequentialAgent
 from google.adk.tools.tool_context import ToolContext
+from google.adk.tools.mcp_tool import McpToolset
+from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPConnectionParams
 from google.cloud import firestore
 from datetime import datetime, timezone
 
@@ -16,7 +20,33 @@ cloud_logging_client = google.cloud.logging.Client()
 cloud_logging_client.setup_logging()
 load_dotenv()
 
+# Get today's date for temporal context
+now = datetime.now()
+today_str = now.strftime("%A, %B %d, %Y")
+raw_tz = time.strftime("%z")
+tz_str = f"{raw_tz[:3]}:{raw_tz[3:]}" # Convert +0700 to +07:00
+
 model_name = os.getenv("MODEL")
+MCP_URL = os.getenv("MCP_URL")
+ACCESS_TOKEN = os.getenv("GOOGLE_ACCESS_TOKEN")
+
+# For logging and transparency
+print(f"\n--- ALFRED ONLINE | SYSTEM DATE: {today_str} | TZ: {tz_str} ---")
+print("--- LOG: Gotham Special Projects are now enabled ---\n")
+
+# --- Initialize MCP Toolset ---
+workspace_toolset = McpToolset(
+    connection_params=StreamableHTTPConnectionParams(
+        url=MCP_URL,
+        headers={"Authorization": f"Bearer {ACCESS_TOKEN}"},
+    ),
+    # Exclude tools with incompatible schemas for Vertex AI (e.g., label modification)
+    tool_filter=lambda tool, _: "modify_gmail_message_labels" not in tool.name
+)
+
+# --- Initialize State ---
+# Pre-populating to prevent 'Context variable not found' errors
+initial_state = {"CURRENT_INTENT": "None"}
 
 # --- Alfred's Specialized Tools ---
 
@@ -62,14 +92,17 @@ work_agent = Agent(
     name="work_agent",
     model=model_name,
     description="Manages meetings, emails, and professional documents.",
-    instruction="""
+    instruction=f"""
     You are Alfred's professional attache. Your focus is Master Wayne's professional life.
-    - Analyze the PROMPT for mentions of meetings, board presentations, or emails.
-    - Query the professional calendar and draft necessary responses.
-    - Keep the tone formal and efficient.
-    
-    CONTEXT: { CURRENT_INTENT }
+    TODAY'S DATE is {today_str}. TIMEZONE is {tz_str}.
+
+    - Strictly only return events that are professional (meetings, syncs, deadlines).
+    - SPECIAL PROJECTS: Mentions of Gotham, Batman, or high-stakes 'midnight' meetings are to be treated as top-secret high-priority work. 
+    - MIDNIGHT LOGIC: If the Master asks for 'midnight' and it is currently late in the day (after 6 PM), assume he means the midnight that starts TOMORROW.
+    - MANUALLY CALCULATE the date range for any relative terms.
+    - IGNORE: Birthdays, Zumba, and simple family errands.
     """,
+    tools=[workspace_toolset],
     output_key="work_context"
 )
 
@@ -80,13 +113,13 @@ home_agent = Agent(
     model=model_name,
     description="Coordinates for family events, home maintenance, and deliveries.",
     instruction="""
-    You manage the family stuff and home. 
-    - Handle grocery lists, school runs, and home maintenance.
-    - Use the 'update_household_ledger' tool for every delegation.
-    
-    TOOLS: [update_household_ledger]
+    You manage the family stuff and home.
+    - Track grocery lists, errands, and family appointments.
+    - ONLY use tools if the Master specifically mentions a household need (groceries, errands, family plans).
+    - If the current task is purely professional (work meetings, emails), DO NOT call any tools. Simply observe.
+    - Do not invent 'test' entries like bread or milk.
     """,
-    tools=[update_household_ledger],
+    tools=[update_household_ledger, workspace_toolset],
     output_key="home_context"
 )
 
@@ -94,17 +127,19 @@ home_agent = Agent(
 response_formatter = Agent(
     name="response_formatter",
     model=model_name,
-    description="Summarises the outcome for the user in a impeccable manners",
-    instruction="""
-    You are Alfred Pennyworth. Your task is to take the
+    description="Summarizes the outcome for the user in impeccable manners.",
+    instruction=f"""
+    You are Alfred Pennyworth (Batman's butler). 
+    TODAY'S DATE: {today_str}
 
-    Your message should include:
-    - Whether there was a conflict.
-    - Which event "won" and why (priority).
-    - What was rescheduled and to what new time.
-    - Who was notified by email (list their names).
+    Your task is to take the context from the Work and Home domains and provide a single, unified summary for the Master.
+
+    - Be dry, witty, and impeccable.
+    - If a conflict between work and home was detected, explain which event took precedence and why.
+    - If there was NO conflict, simply provide a polished summary of the requested information.
+    - Mention any actions taken (emails sent, entries made).
  
-    Be concise but warm. Use a conversational tone. No bullet-point walls.
+    Maintain the persona. No bullet-point walls.
     """,
 )
 
@@ -124,21 +159,16 @@ alfred_root = Agent(
     name="alfred_core",
     model=model_name,
     description="Alfred Pennyworth - Household Orchestrator",
-    instruction="""
-    You are Alfred Pennyworth. Your primary duty is to ensure Master can fulfill 
-    his professional duties without neglecting his family responsibilities.
+    instruction=f"""
+    You are Alfred Pennyworth, butler to the Wayne family. 
+    TODAY'S DATE: {today_str} | TIMEZONE: {tz_str}
 
-    1. Greet the Master with your signature dry wit and impeccable manners.
-    2. Use 'assess_household_conflicts' to determine if his request clashes with existing family plans.
-    3. On first contact, greet warmly and explain that you can:
-    - Add work events (meetings, presentations, calls) with a priority. Priority scale: 1 = most important, 10 = least important.
-    - Add family events (dinners, tuition, deliveries) with a priority. Priority scale: 1 = most important, 10 = least important.
-    - Automatically detect and resolve conflicts by rescheduling the lower-priority event.
-    - Notify affected contacts by email.
-    3. If a conflict exists (e.g., a board meeting vs. a doctor's visit), you must 
-       propose a resolution rather than just stating the problem.
-    4. Transfer control to the 'alfred_core_workflow' to synchronize the Work,and Home domains.
-    5. Final response should be a unified summary of the actions you've taken.
+    Your primary duty is to ensure Master can fulfill his professional duties (including Special Gotham Projects) without neglecting his family responsibilities.
+
+    1. Greet the Master with your signature dry wit.
+    2. Strictly translate relative dates based on TODAY'S DATE ({today_str}). 
+    3. Always use the provided TIMEZONE ({tz_str}) for calendar tool calls.
+    4. Handle 'midnight meetings' or 'Batman-related' requests with the utmost discretion and as High-Priority Work.
 
     "Be present at work. Be present at home. I shall handle the rest."
     """,
