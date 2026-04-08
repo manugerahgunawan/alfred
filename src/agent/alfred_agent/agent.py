@@ -31,6 +31,8 @@ from google.adk.tools.mcp_tool.mcp_session_manager import (
 )
 from google.adk.tools.tool_context import ToolContext
 from google.cloud import firestore
+from google.auth.transport.requests import Request as GoogleAuthRequest
+from google.oauth2.credentials import Credentials as GoogleOAuthCredentials
 from google.genai.types import FunctionDeclaration
 
 from mcp_google_client import MCPGoogleClient
@@ -341,6 +343,69 @@ def _record_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
     return record
 
 
+def _refresh_token_record(
+    app_name: str,
+    user_id: str,
+    session_id: str,
+    record: dict[str, Any],
+) -> dict[str, Any]:
+    access_token = str(record.get(SESSION_ACCESS_TOKEN_KEY, "")).strip()
+    refresh_token = str(record.get(SESSION_REFRESH_TOKEN_KEY, "")).strip()
+    if not refresh_token:
+        return record
+
+    client_id = str(os.getenv("GOOGLE_OAUTH_CLIENT_ID", "")).strip()
+    client_secret = str(os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "")).strip()
+    token_uri = os.getenv("GOOGLE_OAUTH_TOKEN_URI", "https://oauth2.googleapis.com/token")
+    if not client_id or not client_secret:
+        return record
+
+    try:
+        credentials = GoogleOAuthCredentials(
+            token=access_token or None,
+            refresh_token=refresh_token,
+            token_uri=token_uri,
+            client_id=client_id,
+            client_secret=client_secret,
+            scopes=WORKSPACE_SCOPES,
+        )
+        credentials.refresh(GoogleAuthRequest())
+        new_access_token = str(credentials.token or "").strip()
+        if not new_access_token:
+            return record
+
+        refreshed_record = dict(record)
+        refreshed_record[SESSION_ACCESS_TOKEN_KEY] = new_access_token
+        refreshed_record[SESSION_REFRESH_TOKEN_KEY] = refresh_token
+        if credentials.expiry is not None:
+            refreshed_record[SESSION_TOKEN_EXPIRES_AT_KEY] = int(credentials.expiry.timestamp())
+        if record.get(SESSION_TIMEZONE_KEY):
+            refreshed_record[SESSION_TIMEZONE_KEY] = str(record.get(SESSION_TIMEZONE_KEY, "")).strip()
+        if record.get(SESSION_LOCALE_KEY):
+            refreshed_record[SESSION_LOCALE_KEY] = str(record.get(SESSION_LOCALE_KEY, "")).strip()
+
+        if app_name and user_id:
+            store_key = _token_store_key(app_name, user_id)
+            SESSION_TOKEN_STORE[store_key] = dict(refreshed_record)
+            if session_id:
+                SESSION_TOKEN_STORE[session_id] = dict(refreshed_record)
+            _persist_token_record(app_name, user_id, refreshed_record)
+            for alias_key in _token_store_key_candidates(app_name, user_id):
+                alias_app, alias_user = alias_key.split(":", 1)
+                SESSION_TOKEN_STORE[alias_key] = dict(refreshed_record)
+                _persist_token_record(alias_app, alias_user, refreshed_record)
+
+        _debug_trace(
+            f"[Auth] Refreshed access token app={app_name or '<missing>'} user={user_id or '<missing>'} session={session_id or '<missing>'} expires_at={refreshed_record.get(SESSION_TOKEN_EXPIRES_AT_KEY, '<missing>')}"
+        )
+        return refreshed_record
+    except Exception as exc:
+        _debug_trace(
+            f"[Auth] Failed to refresh access token app={app_name or '<missing>'} user={user_id or '<missing>'} session={session_id or '<missing>'} err={exc}"
+        )
+        return record
+
+
 def _persist_token_record(app_name: str, user_id: str, payload: dict[str, Any]) -> None:
     if not app_name or not user_id or not payload:
         return
@@ -646,6 +711,8 @@ def _resolve_access_token(tool_context: ToolContext) -> str:
     user_id = getattr(invocation_context, "user_id", "") if invocation_context else ""
 
     record = _get_token_record(app_name, user_id, session_id)
+    if record:
+        record = _refresh_token_record(app_name, user_id, session_id, record)
     access_token = str(record.get(SESSION_ACCESS_TOKEN_KEY, "")).strip()
     if access_token:
         return access_token
@@ -698,6 +765,7 @@ class SessionAwareCredentialService(BaseCredentialService):
             record = _token_record_from_state(session_state)
         if not record:
             return None
+        record = _refresh_token_record(app_name, user_id, session_id, record)
 
         access_token = str(record.get(SESSION_ACCESS_TOKEN_KEY, "")).strip()
         if not access_token:
@@ -832,12 +900,26 @@ class SessionAwareMcpToolset(McpToolset):
                 mcp_tool=tool,
                 mcp_session_manager=self._mcp_session_manager,
                 auth_scheme=self._auth_scheme,
-                auth_credential=self._auth_credential,
+                auth_credential=None,
             )
 
             if self._is_tool_selected(mcp_tool, readonly_context):
                 tools.append(mcp_tool)
         return tools
+
+    async def _run_async_impl(self, args, tool_context, credential):
+        headers = await self._get_headers(tool_context, credential)
+        auth_header_len = len(headers.get("Authorization", "")) if headers else 0
+        _debug_trace(
+            "[MCP] Executing tool "
+            f"name={getattr(self, 'name', '<unknown>')} "
+            f"url={MCP_URL} headers_present={bool(headers)} auth_header_len={auth_header_len}"
+        )
+        return await super()._run_async_impl(
+            args=args,
+            tool_context=tool_context,
+            credential=credential,
+        )
 
 
 def _build_workspace_toolset() -> Optional[SessionAwareMcpToolset]:
@@ -846,13 +928,12 @@ def _build_workspace_toolset() -> Optional[SessionAwareMcpToolset]:
         return None
 
     auth_scheme = HTTPBearer()
-    raw_auth_credential = _build_bearer_credential("")
 
     return SessionAwareMcpToolset(
         connection_params=StreamableHTTPConnectionParams(url=MCP_URL),
         tool_filter=lambda tool, _: "modify_gmail_message_labels" not in tool.name,
         auth_scheme=auth_scheme,
-        auth_credential=raw_auth_credential,
+        auth_credential=None,
     )
 
 
