@@ -11,7 +11,7 @@ Working adults in Southeast and South Asia live in a permanent state of context-
 - **Professional life** — meetings, clients, deadlines, board presentations, "special projects" that cannot be missed.
 - **Family life** — ageing parents, school runs, medical appointments, domestic helpers, birthdays, the small thousand things that hold a household together.
 
-The boundary between "work" and "home" does not exist cleanly in this region. A supplier call collides with a parent's physiotherapy. A board meeting lands on top of a school concert. A midnight deadline overlaps with a child's fever. The cognitive tax of manually reconciling these conflicts — flipping between five calendars, three chat apps, and a mental list — falls entirely on the individual.
+The boundary between "work" and "home" does not exist cleanly in this region. A client meeting collides with a parent's family dinner. A board meeting lands on top of a school concert. A midnight deadline overlaps with a child's fever. The cognitive tax of manually reconciling these conflicts — flipping between five calendars, three chat apps, and a mental list — falls entirely on the individual.
 
 The result is a daily, invisible toll:
 
@@ -110,14 +110,14 @@ Reply to the Master
 
 **Demo turn (the Thursday clash):**
 
-> *User:* "Dad's physio clashes with my board presentation Thursday."
+> *User:* "Family dinner with my board presentation Thursday."
 
-1. `work_agent` calls `list_events` → board meeting Thu 10:00.
-2. `home_agent` calls `list_events` → physio Thu 10:00.
-3. `response_formatter` sees both contexts, detects the overlap, calls `manage_event` to move the physio to Friday 09:00.
+1. `work_agent` calls `list_events` → board meeting Thu 18:00.
+2. `home_agent` calls `list_events` → Family dinner Thu 18:00.
+3. `response_formatter` sees both contexts, detects the overlap, calls `manage_event` to move the family dinner to Friday 18:00.
 4. `search_contacts` finds the clinic; `send_gmail_message` drafts and sends the reschedule email.
 5. `update_household_ledger` writes the action into Firestore `agentActions`.
-6. Alfred replies: *"The physio is on Friday, sir. The clinic has been duly informed. Your board meeting stands."*
+6. Alfred replies: *"The family dinner is on Friday, sir. Family and restaurant have been duly informed. Your board meeting stands."*
 
 ---
 
@@ -180,7 +180,7 @@ A simple, single-turn view of what happens when a user sends Alfred a message.
 ```
         ┌─────────────────────────────┐
         │           USER              │
-        │   "Dad's physio clashes     │
+        │   "Family dinner clashes    │
         │    with my board Thu"       │
         └──────────────┬──────────────┘
                        │ natural language
@@ -226,8 +226,8 @@ A simple, single-turn view of what happens when a user sends Alfred a message.
                        ▼
         ┌─────────────────────────────┐
         │     ALFRED REPLIES          │
-        │ "The physio is on Friday,   │
-        │  sir. Clinic informed."     │
+        │ "The family dinner is on    │
+        │  Friday, sir. All informed."│
         └─────────────────────────────┘
 ```
 
@@ -243,20 +243,20 @@ A simple 4-screen mock of the user-facing surface.
 ┌──────────────────────┐  ┌──────────────────────┐
 │   HOME DASHBOARD     │  │     ALFRED CHAT      │
 │ ──────────────────── │  │ ──────────────────── │
-│  Good morning, sir.  │  │  A: "Dad's physio    │
+│  Good morning, sir.  │  │  A: "Family dinner   │
 │  Today's agenda:     │  │      moved to Fri.   │
 │                      │  │      Clinic notified"│
 │  [WORK]              │  │                      │
 │  • Board meeting     │  │  You: "Also remind   │
-│    Thu 10:00         │  │        me to call    │
-│  • Supplier call     │  │        the clinic"   │
+│    Thu 18:00         │  │        me to call    │
+│  • Supplier call     │  │    the restaurant"   │
 │    Thu 15:00         │  │                      │
 │                      │  │  A: "Naturally, sir."│
 │  [HOME]              │  │                      │
-│  • Dad physio  ⚠     │  │ ─────────────────────│
-│    Thu 10:00 CLASH   │  │  [ Tell Alfred…   ]  │
+│  • Family dinner  ⚠  │  │ ─────────────────────│
+│    Thu 18:00 CLASH   │  │  [ Tell Alfred…   ]  │
 │  • School concert    │  │                      │
-│    Fri 18:00         │  │                      │
+│    Wed 18:00         │  │                      │
 │ ──────────────────── │  │                      │
 │  [ Tell Alfred… ]    │  │                      │
 └──────────────────────┘  └──────────────────────┘
@@ -266,12 +266,12 @@ A simple 4-screen mock of the user-facing surface.
 │ ──────────────────── │  │ ──────────────────── │
 │  ┌────────────────┐  │  │  ⚠  CONFLICT         │
 │  │ Dad   (Parent) │  │  │  Board meeting and   │
-│  │ Physio Thu     │  │  │  physio Thu 10:00    │
+│  │ Dinner Thu     │  │  │  Dinner Thu 18:00    │
 │  └────────────────┘  │  │  [Resolve] [Later]   │
 │  ┌────────────────┐  │  │                      │
 │  │ Mei  (Child)   │  │  │  ── Alfred's log ──  │
-│  │ Concert Fri    │  │  │  ✓ Physio → Fri 9am  │
-│  └────────────────┘  │  │  ✓ Clinic emailed    │
+│  │ Concert Fri    │  │  │  ✓ Dinner → Fri 18:00│
+│  └────────────────┘  │  │  ✓ Restaurant emailed│
 │  ┌────────────────┐  │  │  ✓ Helper notified   │
 │  │ Siti (Helper)  │  │  │  ✓ Logged Firestore  │
 │  │ On duty        │  │  │                      │
@@ -381,7 +381,7 @@ A simple layered view of the system. Each box is a real, deployed component.
 | Deployment region | **Cloud Run — `asia-southeast2` (Jakarta)** | Closest GCP region to the target SEA user base — lowest latency for Workspace + Vertex calls and keeps user data in-region. |
 | Workspace APIs | **Google Calendar, Gmail, People (Contacts), Meet** | The actual action surface. Alfred's value is in how it *coordinates* these, not in replacing them. |
 | Frontend hosting (optional) | **Firebase Hosting** | CDN-backed, one-command deploy, pairs natively with Firestore and Firebase Auth. |
-| Forward path (production) | **AlloyDB AI** | When Alfred's memory grows large enough that semantic recall matters ("what did Alfred do last time Dad missed physio?"), AlloyDB AI gives us SQL + vector search in a single store, replacing Firestore for relational + semantic queries. |
+| Forward path (production) | **AlloyDB AI** | When Alfred's memory grows large enough that semantic recall matters ("what did Alfred do last time Dad missed family dinner?"), AlloyDB AI gives us SQL + vector search in a single store, replacing Firestore for relational + semantic queries. |
 
 ### Why this AI stack and system design supports scalability and real-world deployment
 
