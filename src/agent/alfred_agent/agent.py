@@ -480,10 +480,12 @@ def setup_cloud_logging():
             logging.warning(f"[Logging] Could not initialize Cloud Logging: {e}")
 
 
-# Get today's date for temporal context
-now = datetime.now()
+# Get today's date for temporal context (timezone-aware)
+_agent_tz = ZoneInfo(os.getenv("TIMEZONE", "Asia/Bangkok"))
+now = datetime.now(_agent_tz)
 today_str = now.strftime("%A, %B %d, %Y")
-raw_tz = time.strftime("%z")
+today_iso = now.strftime("%Y-%m-%d")
+raw_tz = now.strftime("%z")
 tz_str = f"{raw_tz[:3]}:{raw_tz[3:]}"  # Convert +0700 to +07:00
 
 model_name = os.getenv("MODEL")
