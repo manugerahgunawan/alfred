@@ -20,3 +20,5 @@ node_modules/
 # Database files
 session.db
 *.db
+playwright-report/
+test-results/
