@@ -15,13 +15,13 @@ describe('App UI', () => {
     render(<App />);
 
     await user.click(screen.getByRole('button', {name: /Contacts/i}));
-    expect(screen.getByText(/Household Members/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Household Members/i)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', {name: /Profile/i}));
-    expect(screen.getByText(/Profile Settings/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Profile Settings/i)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', {name: /Alfred/i}));
-    expect(screen.getByText(/Always at your service/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Always at your service/i)).toBeInTheDocument();
   });
 
   it('provides chat controls that users can interact with', async () => {
@@ -30,7 +30,7 @@ describe('App UI', () => {
 
     await user.click(screen.getByRole('button', {name: /Alfred/i}));
 
-    const messageInput = screen.getByPlaceholderText(/Type a message/i);
+    const messageInput = await screen.findByPlaceholderText(/Type a message/i);
     await user.type(messageInput, 'Test message');
 
     expect(messageInput).toHaveValue('Test message');

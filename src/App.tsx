@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   LayoutDashboard,
@@ -20,8 +20,18 @@ import {
   Sparkles,
   PencilLine,
   Bell,
-  CheckCircle2
+  CheckCircle2,
+  Focus,
+  LogIn,
+  Loader2,
 } from 'lucide-react';
+import {
+  createAlfredSession,
+  sendToAlfred,
+  startGoogleOAuth,
+  parseOAuthFragment,
+  fetchUserEmail,
+} from './api/alfred';
 
 type Tab = 'dashboard' | 'chat' | 'contacts' | 'profile';
 type ContactContext = 'work' | 'home';
@@ -43,6 +53,15 @@ interface Contact {
   role: string;
   context: ContactContext;
   note?: string;
+  gmail?: string;
+}
+
+interface AuthState {
+  token: string;
+  email: string;
+  sessionId: string;
+  loading: boolean;
+  error: string;
 }
 
 interface Message {
@@ -144,11 +163,17 @@ const EventDetails = ({
   contacts,
   onReschedule,
   onRemind,
+  onFocus,
+  alfredReply,
+  alfredLoading,
 }: {
   event: EventItem | null;
   contacts: Contact[];
   onReschedule: (event: EventItem) => void;
   onRemind: (event: EventItem) => void;
+  onFocus: (event: EventItem) => void;
+  alfredReply?: string;
+  alfredLoading?: boolean;
 }) => {
   if (!event) {
     return (
@@ -206,6 +231,25 @@ const EventDetails = ({
           Send reminder
         </button>
       </div>
+
+      <button
+        onClick={() => onFocus(event)}
+        className="mt-3 w-full flex items-center justify-center gap-2 bg-navy/10 border border-navy/20 text-navy text-sm py-2.5 rounded-xl font-semibold hover:bg-navy/15 transition-colors"
+      >
+        <Focus size={14} /> Reserve Focus Time
+      </button>
+
+      {(alfredLoading || alfredReply) && (
+        <div className="mt-3 bg-white/60 border border-amber/20 rounded-xl p-3 text-xs text-charcoal/80">
+          {alfredLoading ? (
+            <span className="flex items-center gap-2 text-charcoal/50">
+              <Loader2 size={12} className="animate-spin" /> Alfred is working on it…
+            </span>
+          ) : (
+            <span><span className="font-semibold text-amber">Alfred: </span>{alfredReply}</span>
+          )}
+        </div>
+      )}
     </motion.div>
   );
 };
@@ -287,6 +331,13 @@ const DashboardScreen = ({
   dashboardInput,
   setDashboardInput,
   sendDashboardChat,
+  onReschedule,
+  onRemind,
+  onFocus,
+  alfredReply,
+  alfredLoading,
+  dashboardLoading,
+  dashboardReply,
 }: {
   profile: UserProfile;
   setProfile: React.Dispatch<React.SetStateAction<UserProfile>>;
@@ -298,6 +349,13 @@ const DashboardScreen = ({
   dashboardInput: string;
   setDashboardInput: React.Dispatch<React.SetStateAction<string>>;
   sendDashboardChat: () => void;
+  onReschedule: (event: EventItem) => void;
+  onRemind: (event: EventItem) => void;
+  onFocus: (event: EventItem) => void;
+  alfredReply?: string;
+  alfredLoading?: boolean;
+  dashboardLoading?: boolean;
+  dashboardReply?: string;
 }) => {
   const weekTotal = events.length;
   const workCount = events.filter((e) => e.context === 'work').length;
@@ -357,8 +415,11 @@ const DashboardScreen = ({
       <EventDetails
         event={selectedEvent}
         contacts={contacts}
-        onReschedule={(event) => addLog(`Rescheduled ${event.title} to next available slot.`)}
-        onRemind={(event) => addLog(`Reminder sent for ${event.title} to related contacts.`)}
+        onReschedule={onReschedule}
+        onRemind={onRemind}
+        onFocus={onFocus}
+        alfredReply={alfredReply}
+        alfredLoading={alfredLoading}
       />
 
       <SectionHeader title="Quick Chat In Dashboard" />
@@ -370,15 +431,24 @@ const DashboardScreen = ({
           placeholder="Ask Alfred from dashboard"
           className="flex-1 bg-transparent border-none outline-none px-3 py-2 text-sm text-charcoal placeholder:text-charcoal/40"
         />
-        <button onClick={sendDashboardChat} className="bg-amber text-white p-2 rounded-xl">
-          <Send size={17} />
+        <button onClick={sendDashboardChat} disabled={dashboardLoading} className="bg-amber text-white p-2 rounded-xl disabled:opacity-60">
+          {dashboardLoading ? <Loader2 size={17} className="animate-spin" /> : <Send size={17} />}
         </button>
       </div>
+      {dashboardReply && (
+        <div className="mt-3 bg-white/60 border border-amber/20 rounded-xl p-3 text-xs text-charcoal/80">
+          <span className="font-semibold text-amber">Alfred: </span>{dashboardReply}
+        </div>
+      )}
     </div>
   );
 };
 
-const ChatScreen = () => {
+const ChatScreen = ({
+  callAlfred,
+}: {
+  callAlfred?: (msg: string) => Promise<string>;
+}) => {
   const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -390,7 +460,7 @@ const ChatScreen = () => {
     }
   }, [messages, isTyping]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!inputValue.trim()) return;
 
     const newUserMsg: Message = {
@@ -404,17 +474,23 @@ const ChatScreen = () => {
     setInputValue('');
     setIsTyping(true);
 
-    // Simulate Alfred's response
-    setTimeout(() => {
-      const alfredMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        sender: 'alfred',
-        text: "Acknowledged. I mapped this to your current priorities and prepared the next action.",
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, alfredMsg]);
-      setIsTyping(false);
-    }, 1500);
+    let replyText = "Acknowledged. I mapped this to your current priorities and prepared the next action.";
+    if (callAlfred) {
+      try {
+        replyText = await callAlfred(newUserMsg.text);
+      } catch {
+        replyText = "I encountered an issue connecting to Alfred. Please check your connection.";
+      }
+    }
+
+    const alfredMsg: Message = {
+      id: (Date.now() + 1).toString(),
+      sender: 'alfred',
+      text: replyText,
+      timestamp: new Date()
+    };
+    setMessages(prev => [...prev, alfredMsg]);
+    setIsTyping(false);
   };
 
   return (
@@ -467,7 +543,7 @@ const ChatScreen = () => {
             type="text" 
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
             placeholder="Type a message..." 
             className="flex-1 bg-transparent border-none outline-none px-3 py-2 text-sm text-charcoal placeholder:text-charcoal/30"
           />
@@ -493,13 +569,15 @@ const ContactsScreen = ({
 }) => {
   const [name, setName] = useState('');
   const [role, setRole] = useState('');
+  const [gmail, setGmail] = useState('');
   const [context, setContext] = useState<ContactContext>('home');
 
   const submit = () => {
     if (!name.trim() || !role.trim()) return;
-    onAdd({ name, role, context });
+    onAdd({ name, role, context, gmail: gmail.trim() || undefined });
     setName('');
     setRole('');
+    setGmail('');
     setContext('home');
   };
 
@@ -522,6 +600,7 @@ const ContactsScreen = ({
         <div className="space-y-2">
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" className="w-full rounded-xl bg-cream/70 border border-amber/20 px-3 py-2 text-sm outline-none" />
           <input value={role} onChange={(e) => setRole(e.target.value)} placeholder="Role" className="w-full rounded-xl bg-cream/70 border border-amber/20 px-3 py-2 text-sm outline-none" />
+          <input value={gmail} onChange={(e) => setGmail(e.target.value)} placeholder="Gmail (optional, for reminders)" type="email" className="w-full rounded-xl bg-cream/70 border border-amber/20 px-3 py-2 text-sm outline-none" />
           <div className="flex gap-2">
             <button onClick={() => setContext('home')} className={`flex-1 py-2 rounded-xl text-sm font-semibold ${context === 'home' ? 'bg-amber text-white' : 'bg-charcoal/10 text-charcoal'}`}>
               Home
@@ -620,6 +699,68 @@ const ProfileScreen = ({
   );
 };
 
+const ConnectBanner = ({
+  auth,
+  onConnect,
+  onPasteToken,
+}: {
+  auth: AuthState;
+  onConnect: () => void;
+  onPasteToken: (token: string) => void;
+}) => {
+  const [showPaste, setShowPaste] = useState(false);
+  const [pasteValue, setPasteValue] = useState('');
+
+  if (auth.token && auth.sessionId && !auth.loading) return null;
+
+  return (
+    <div className="mx-6 mt-4 mb-2 bg-charcoal text-white rounded-2xl p-4">
+      <div className="flex items-center gap-2 mb-2">
+        <LogIn size={16} className="text-amber" />
+        <span className="text-sm font-semibold font-serif">Connect Google to use live Alfred</span>
+      </div>
+      {auth.loading ? (
+        <div className="flex items-center gap-2 text-xs text-white/60">
+          <Loader2 size={12} className="animate-spin" />
+          {auth.sessionId ? 'Session ready' : auth.email ? 'Creating Alfred session…' : 'Signing in…'}
+        </div>
+      ) : (
+        <>
+          {auth.error && <p className="text-xs text-red-400 mb-2">{auth.error}</p>}
+          <button
+            onClick={onConnect}
+            className="w-full bg-amber text-white py-2 rounded-xl text-sm font-semibold mb-2"
+          >
+            Sign in with Google
+          </button>
+          <button
+            onClick={() => setShowPaste(v => !v)}
+            className="w-full text-xs text-white/50 underline"
+          >
+            {showPaste ? 'Hide' : 'Or paste access token (demo mode)'}
+          </button>
+          {showPaste && (
+            <div className="mt-2 flex gap-2">
+              <input
+                value={pasteValue}
+                onChange={e => setPasteValue(e.target.value)}
+                placeholder="Paste Google access token"
+                className="flex-1 bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-xs outline-none"
+              />
+              <button
+                onClick={() => { onPasteToken(pasteValue); setPasteValue(''); setShowPaste(false); }}
+                className="bg-amber text-white px-3 py-2 rounded-xl text-xs font-semibold"
+              >
+                Use
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+};
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [profile, setProfile] = useState<UserProfile>({
@@ -630,11 +771,65 @@ export default function App() {
     onboardingDone: false,
   });
   const [contacts, setContacts] = useState<Contact[]>(INITIAL_CONTACTS);
-  const [events] = useState<EventItem[]>(INITIAL_EVENTS);
+  const [events, setEvents] = useState<EventItem[]>(INITIAL_EVENTS);
   const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(INITIAL_EVENTS[0]);
   const [actionLog, setActionLog] = useState<string[]>([]);
   const [dashboardInput, setDashboardInput] = useState('');
 
+  // ─── Auth State ─────────────────────────────────────────────────────────────
+  const [auth, setAuth] = useState<AuthState>(() => ({
+    token: localStorage.getItem('alfred_token') ?? '',
+    email: localStorage.getItem('alfred_email') ?? '',
+    sessionId: localStorage.getItem('alfred_session') ?? '',
+    loading: false,
+    error: '',
+  }));
+
+  // ─── Alfred action reply state ───────────────────────────────────────────────
+  const [alfredReply, setAlfredReply] = useState('');
+  const [alfredLoading, setAlfredLoading] = useState(false);
+  const [dashboardLoading, setDashboardLoading] = useState(false);
+  const [dashboardReply, setDashboardReply] = useState('');
+
+  // ─── Parse OAuth fragment on mount ───────────────────────────────────────────
+  useEffect(() => {
+    const token = parseOAuthFragment();
+    if (!token) return;
+    // Clear hash from URL
+    history.replaceState(null, '', window.location.pathname);
+    localStorage.setItem('alfred_token', token);
+    setAuth(prev => ({ ...prev, token, sessionId: '', loading: true, error: '' }));
+    fetchUserEmail(token)
+      .then(email => {
+        localStorage.setItem('alfred_email', email);
+        setAuth(prev => ({ ...prev, email, loading: false }));
+      })
+      .catch(() => setAuth(prev => ({ ...prev, loading: false })));
+  }, []);
+
+  // ─── Create ADK session when token ready but no session ─────────────────────
+  useEffect(() => {
+    if (!auth.token || !auth.email || auth.sessionId || auth.loading) return;
+    setAuth(prev => ({ ...prev, loading: true, error: '' }));
+    createAlfredSession(auth.email, auth.token)
+      .then(sessionId => {
+        localStorage.setItem('alfred_session', sessionId);
+        setAuth(prev => ({ ...prev, sessionId, loading: false }));
+      })
+      .catch(err => {
+        setAuth(prev => ({ ...prev, loading: false, error: String(err) }));
+      });
+  }, [auth.token, auth.email, auth.sessionId, auth.loading]);
+
+  // ─── callAlfred helper ───────────────────────────────────────────────────────
+  const callAlfred = useCallback(async (msg: string): Promise<string> => {
+    if (!auth.sessionId || !auth.email) {
+      return "Please connect your Google account first to use Alfred's live features.";
+    }
+    return sendToAlfred(auth.email, auth.sessionId, msg);
+  }, [auth.email, auth.sessionId]);
+
+  // ─── Logging ─────────────────────────────────────────────────────────────────
   const addLog = (entry: string) => {
     setActionLog((prev) => [`${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${entry}`, ...prev].slice(0, 8));
   };
@@ -644,12 +839,95 @@ export default function App() {
     addLog(`Added ${contact.context} contact: ${contact.name}.`);
   };
 
-  const sendDashboardChat = () => {
-    if (!dashboardInput.trim()) return;
-    addLog(`Chat request sent: ${dashboardInput}`);
-    setDashboardInput('');
+  // ─── Event action handlers ────────────────────────────────────────────────────
+  const handleReschedule = async (event: EventItem) => {
+    addLog(`Requesting reschedule for ${event.title}…`);
+    setAlfredReply('');
+    setAlfredLoading(true);
+    try {
+      const reply = await callAlfred(
+        `Please reschedule "${event.title}" on ${event.day} at ${event.time}. Find the next available free slot in the next 7 days and update the calendar.`
+      );
+      setAlfredReply(reply);
+      addLog(`Reschedule requested: ${event.title}`);
+    } catch {
+      setAlfredReply('Alfred could not complete the reschedule request.');
+    }
+    setAlfredLoading(false);
   };
 
+  const handleRemind = async (event: EventItem) => {
+    const related = contacts.filter(c => event.relatedContactIds.includes(c.id));
+    const emails = related.map(c => c.gmail ?? c.name).join(', ');
+    addLog(`Requesting reminder for ${event.title}…`);
+    setAlfredReply('');
+    setAlfredLoading(true);
+    try {
+      const reply = await callAlfred(
+        `Send a reminder email for "${event.title}" on ${event.day} at ${event.time}${event.location ? ` at ${event.location}` : ''}. ${emails ? `Recipients: ${emails}.` : ''} Keep it brief and professional.`
+      );
+      setAlfredReply(reply);
+      addLog(`Reminder sent for ${event.title}`);
+    } catch {
+      setAlfredReply('Alfred could not send the reminder.');
+    }
+    setAlfredLoading(false);
+  };
+
+  const handleFocus = async (event: EventItem) => {
+    addLog(`Requesting focus block for ${event.title}…`);
+    setAlfredReply('');
+    setAlfredLoading(true);
+    try {
+      const reply = await callAlfred(
+        `Block 1 hour of focus time before "${event.title}" on ${event.day} at ${event.time}. Mark it as busy and add a note saying it's pre-${event.title} prep time.`
+      );
+      setAlfredReply(reply);
+      addLog(`Focus block requested for ${event.title}`);
+    } catch {
+      setAlfredReply('Alfred could not block focus time.');
+    }
+    setAlfredLoading(false);
+  };
+
+  const sendDashboardChat = async () => {
+    if (!dashboardInput.trim()) return;
+    const msg = dashboardInput.trim();
+    addLog(`Dashboard query: ${msg}`);
+    setDashboardInput('');
+    setDashboardLoading(true);
+    setDashboardReply('');
+    try {
+      const reply = await callAlfred(msg);
+      setDashboardReply(reply);
+    } catch {
+      setDashboardReply('Alfred could not respond at this moment.');
+    }
+    setDashboardLoading(false);
+  };
+
+  // ─── Auth connect/disconnect helpers ─────────────────────────────────────────
+  const handleConnect = () => {
+    try {
+      startGoogleOAuth();
+    } catch (e) {
+      setAuth(prev => ({ ...prev, error: String(e) }));
+    }
+  };
+
+  const handlePasteToken = (token: string) => {
+    localStorage.setItem('alfred_token', token);
+    localStorage.removeItem('alfred_session');
+    setAuth({ token, email: '', sessionId: '', loading: true, error: '' });
+    fetchUserEmail(token)
+      .then(email => {
+        localStorage.setItem('alfred_email', email);
+        setAuth(prev => ({ ...prev, email, loading: false }));
+      })
+      .catch(() => setAuth(prev => ({ ...prev, email: 'user@gmail.com', loading: false })));
+  };
+
+  // ─── Render helpers ───────────────────────────────────────────────────────────
   const renderScreen = () => {
     switch (activeTab) {
       case 'dashboard':
@@ -665,9 +943,16 @@ export default function App() {
             dashboardInput={dashboardInput}
             setDashboardInput={setDashboardInput}
             sendDashboardChat={sendDashboardChat}
+            onReschedule={handleReschedule}
+            onRemind={handleRemind}
+            onFocus={handleFocus}
+            alfredReply={alfredReply}
+            alfredLoading={alfredLoading}
+            dashboardLoading={dashboardLoading}
+            dashboardReply={dashboardReply}
           />
         );
-      case 'chat': return <ChatScreen />;
+      case 'chat': return <ChatScreen callAlfred={callAlfred} />;
       case 'contacts': return <ContactsScreen contacts={contacts} onAdd={addContact} />;
       case 'profile': return <ProfileScreen profile={profile} setProfile={setProfile} actionLog={actionLog} />;
       default: return null;
@@ -678,6 +963,7 @@ export default function App() {
     <div className="min-h-screen bg-cream font-sans selection:bg-amber/20 flex justify-center">
       <div className="w-full max-w-[390px] bg-cream/90 min-h-screen relative shadow-2xl overflow-hidden flex flex-col border-x border-charcoal/10">
         <main className="flex-1 overflow-y-auto">
+          <ConnectBanner auth={auth} onConnect={handleConnect} onPasteToken={handlePasteToken} />
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
