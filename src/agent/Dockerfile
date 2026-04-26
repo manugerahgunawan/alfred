@@ -30,6 +30,6 @@ EXPOSE 8080
 CMD adk web \
 	--port=${PORT:-8080} \
 	--host=0.0.0.0 \
-	--cors_allow_origins=${CORS_ALLOW_ORIGINS:-http://localhost:3000} \
+	--allow_origins=${CORS_ALLOW_ORIGINS:-http://localhost:3000} \
 	--session_service_uri=firestore://${GOOGLE_CLOUD_PROJECT:-alfred-492407} \
 	"/app/agents"
