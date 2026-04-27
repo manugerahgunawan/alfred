@@ -44,7 +44,7 @@ export async function createAlfredSession(
   timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Bangkok'
 ): Promise<string> {
   const res = await fetch(
-    `${ALFRED_BASE_URL}/apps/${APP_NAME}/users/${encodeURIComponent(userId)}/sessions`,
+    `${ALFRED_BASE_URL}/apps/${APP_NAME}/users/${encodeURIComponent(userId)}/sessions/`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
