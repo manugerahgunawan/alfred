@@ -136,20 +136,44 @@
   "hotPaths": [
     {
       "path": "",
-      "accessCount": 6,
-      "lastAccessed": 1777366276873,
+      "accessCount": 14,
+      "lastAccessed": 1777371441021,
       "type": "directory"
     },
     {
       "path": "src\\api\\alfred.ts",
+      "accessCount": 6,
+      "lastAccessed": 1777368249486,
+      "type": "file"
+    },
+    {
+      "path": "src\\agent\\run.py",
       "accessCount": 4,
-      "lastAccessed": 1777367577485,
+      "lastAccessed": 1777370193885,
+      "type": "file"
+    },
+    {
+      "path": "src\\agent\\Dockerfile",
+      "accessCount": 3,
+      "lastAccessed": 1777369410937,
       "type": "file"
     },
     {
       "path": "Dockerfile",
       "accessCount": 2,
       "lastAccessed": 1777366545156,
+      "type": "file"
+    },
+    {
+      "path": "src\\agent\\alfred_agent\\venv\\Lib\\site-packages\\google\\adk\\cli\\fast_api.py",
+      "accessCount": 2,
+      "lastAccessed": 1777369378246,
+      "type": "directory"
+    },
+    {
+      "path": "DEVELOPMENT.md",
+      "accessCount": 2,
+      "lastAccessed": 1777371466582,
       "type": "file"
     },
     {
@@ -180,6 +204,66 @@
       "path": ".dockerignore",
       "accessCount": 1,
       "lastAccessed": 1777366201596,
+      "type": "file"
+    },
+    {
+      "path": "src\\agent\\services.py",
+      "accessCount": 1,
+      "lastAccessed": 1777369314780,
+      "type": "file"
+    },
+    {
+      "path": "src\\agent\\alfred_agent\\venv\\Lib\\site-packages\\google\\adk\\cli\\cli.py",
+      "accessCount": 1,
+      "lastAccessed": 1777369373579,
+      "type": "directory"
+    },
+    {
+      "path": "README.md",
+      "accessCount": 1,
+      "lastAccessed": 1777371310150,
+      "type": "file"
+    },
+    {
+      "path": "src\\App.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1777371310371,
+      "type": "file"
+    },
+    {
+      "path": "src\\agent\\alfred_agent\\README.md",
+      "accessCount": 1,
+      "lastAccessed": 1777371448328,
+      "type": "file"
+    },
+    {
+      "path": "src\\agent\\alfred_agent\\LOCAL_SETUP.md",
+      "accessCount": 1,
+      "lastAccessed": 1777371448376,
+      "type": "file"
+    },
+    {
+      "path": "src\\mcpRunner\\adk_agent_guide.md",
+      "accessCount": 1,
+      "lastAccessed": 1777371448614,
+      "type": "file"
+    },
+    {
+      "path": "src\\mcpRunner\\README.md",
+      "accessCount": 1,
+      "lastAccessed": 1777371448633,
+      "type": "file"
+    },
+    {
+      "path": "src\\mcpRunner\\documentation.md",
+      "accessCount": 1,
+      "lastAccessed": 1777371448649,
+      "type": "file"
+    },
+    {
+      "path": "src\\agent\\alfred_agent\\architecture.md",
+      "accessCount": 1,
+      "lastAccessed": 1777371448681,
       "type": "file"
     }
   ],

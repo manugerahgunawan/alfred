@@ -1,7 +1,7 @@
 {
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd c:/Users/manug/Documents/Alfred/alfred && git branch -D feature/agent-add-backup feature/agent-add 2>/dev/null; git branch feature/agent-add-backup d513d7b && git checkout feature/agent...",
-  "error": "Exit code 1\nDeleted branch feature/agent-add-backup (was d513d7b).\nSwitched to branch 'feature/agent-add-backup'\nHEAD is now at d513d7b chore: remove unused agent definition for clarity\nAuto-merging .gitignore\nCONFLICT (content): Merge conflict in .gitignore\nOn branch feature/agent-add\nUnmerged paths:\n  (use \"git restore --staged <file>...\" to unstage)\n  (use \"git add <file>...\" to mark resolution)\n\tboth modified:   .gitignore\n\nUntracked files:\n  (use \"git add <file>...\" to include in what will ...",
-  "timestamp": "2026-04-28T07:17:37.583Z",
+  "tool_name": "mcp__gcloud__run_gcloud_command",
+  "tool_input_preview": "{\"args\":[\"run\",\"revisions\",\"logs\",\"alfred-agent-00034-9xp\",\"--service=alfred-agent\",\"--region=asia-southeast2\",\"--project=alfred-492407\",\"--limit=30\"]}",
+  "error": "UnrecognizedCommandError: Invalid choice: 'logs'",
+  "timestamp": "2026-04-28T09:52:46.725Z",
   "retry_count": 4
 }

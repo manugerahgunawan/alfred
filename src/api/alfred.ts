@@ -9,9 +9,26 @@
  *     The redirect URI (window.location.origin) must be registered in GCP Console.
  */
 
-export const ALFRED_BASE_URL =
+const RAW_ALFRED_BASE_URL =
   (import.meta as unknown as { env: Record<string, string> }).env
-    .VITE_ALFRED_BASE_URL || 'https://alfredagent-181562945855.asia-southeast1.run.app';
+    .VITE_ALFRED_BASE_URL || 'https://alfred-agent-gloaqqynxq-et.a.run.app';
+
+function normalizeHttpsUrl(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return trimmed;
+
+  try {
+    const url = new URL(trimmed);
+    if (url.protocol === 'http:') {
+      url.protocol = 'https:';
+    }
+    return url.toString().replace(/\/$/, '');
+  } catch {
+    return trimmed.replace(/^http:\/\//i, 'https://').replace(/\/$/, '');
+  }
+}
+
+export const ALFRED_BASE_URL = normalizeHttpsUrl(RAW_ALFRED_BASE_URL);
 
 const APP_NAME = 'alfred_agent';
 
@@ -44,7 +61,7 @@ export async function createAlfredSession(
   timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Bangkok'
 ): Promise<string> {
   const res = await fetch(
-    `${ALFRED_BASE_URL}/apps/${APP_NAME}/users/${encodeURIComponent(userId)}/sessions`,
+    `${ALFRED_BASE_URL}/apps/${APP_NAME}/users/${encodeURIComponent(userId).replace('%40', '@')}/sessions`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -79,7 +96,7 @@ export async function sendToAlfred(
   message: string
 ): Promise<string> {
   const res = await fetch(
-    `${ALFRED_BASE_URL}/apps/${APP_NAME}/users/${encodeURIComponent(userId)}/sessions/${encodeURIComponent(sessionId)}/run`,
+    `${ALFRED_BASE_URL}/apps/${APP_NAME}/users/${encodeURIComponent(userId).replace('%40', '@')}/sessions/${encodeURIComponent(sessionId)}/run`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
