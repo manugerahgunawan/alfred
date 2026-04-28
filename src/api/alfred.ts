@@ -36,6 +36,7 @@ const APP_NAME = 'alfred_agent';
 
 interface ADKRunEventPart {
   text?: string;
+  thoughtSignature?: string;
 }
 
 interface ADKRunEvent {
@@ -87,14 +88,19 @@ export async function createAlfredSession(
 
 // ─── Run ──────────────────────────────────────────────────────────────────────
 
+export interface AlfredResponse {
+  text: string;
+  thought?: string;
+}
+
 /**
- * Sends a natural-language message to Alfred and returns the final text reply.
+ * Sends a natural-language message to Alfred and returns the reply + thought.
  */
 export async function sendToAlfred(
   userId: string,
   sessionId: string,
   message: string
-): Promise<string> {
+): Promise<AlfredResponse> {
   const res = await fetch(
     `${ALFRED_BASE_URL}/run`,
     {
@@ -118,26 +124,31 @@ export async function sendToAlfred(
   }
 
   const contentType = res.headers.get('content-type') ?? '';
+  console.log('[alfred] content-type:', contentType);
   if (contentType.includes('text/event-stream')) {
     const text = await res.text();
-    return parseSSEFinalText(text);
+    return parseSSEFinalTextWithThought(text);
   }
 
   const data = (await res.json()) as ADKRunEvent[];
-  return extractFinalText(Array.isArray(data) ? data : []);
+  console.log('[alfred] json events:', data);
+  return extractFinalTextWithThought(Array.isArray(data) ? data : []);
 }
 
 // ─── Response parsing ─────────────────────────────────────────────────────────
 
-function parseSSEFinalText(sseText: string): string {
+function parseSSEFinalTextWithThought(sseText: string): AlfredResponse {
   const lines = sseText.split('\n');
   let lastText = '';
+  let thought = '';
   for (const line of lines) {
     if (!line.startsWith('data: ')) continue;
     try {
       const ev = JSON.parse(line.slice(6)) as ADKRunEvent;
+      console.log('[alfred:sse]', ev);
       if (ev.is_final_response && ev.content?.parts) {
         for (const part of ev.content.parts) {
+          if (part.thoughtSignature) thought = part.thoughtSignature;
           if (part.text) lastText = part.text;
         }
       }
@@ -145,29 +156,35 @@ function parseSSEFinalText(sseText: string): string {
       // skip malformed SSE line
     }
   }
-  return lastText || FALLBACK_REPLY;
+  return { text: lastText || FALLBACK_REPLY, thought: thought || undefined };
 }
 
-function extractFinalText(events: ADKRunEvent[]): string {
+function extractFinalTextWithThought(events: ADKRunEvent[]): AlfredResponse {
+  let lastText = '';
+  let thought = '';
   // Prefer explicit final-response flag
   for (let i = events.length - 1; i >= 0; i--) {
     const ev = events[i];
     if (ev.is_final_response && ev.content?.parts) {
       for (const part of ev.content.parts) {
-        if (part.text) return part.text;
+        if (part.thoughtSignature) thought = part.thoughtSignature;
+        if (part.text) lastText = part.text;
       }
     }
   }
   // Fallback: last model text
-  for (let i = events.length - 1; i >= 0; i--) {
-    const ev = events[i];
-    if (ev.content?.role === 'model' && ev.content.parts) {
-      for (const part of ev.content.parts) {
-        if (part.text) return part.text;
+  if (!lastText) {
+    for (let i = events.length - 1; i >= 0; i--) {
+      const ev = events[i];
+      if (ev.content?.role === 'model' && ev.content.parts) {
+        for (const part of ev.content.parts) {
+          if (part.thoughtSignature) thought = part.thoughtSignature;
+          if (part.text) lastText = part.text;
+        }
       }
     }
   }
-  return FALLBACK_REPLY;
+  return { text: lastText || FALLBACK_REPLY, thought: thought || undefined };
 }
 
 const FALLBACK_REPLY = 'I am unable to respond at this moment, sir.';

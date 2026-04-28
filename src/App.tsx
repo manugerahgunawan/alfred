@@ -68,6 +68,7 @@ interface Message {
   id: string;
   sender: 'user' | 'alfred';
   text: string;
+  thought?: string;
   timestamp: Date;
 }
 
@@ -446,8 +447,10 @@ const DashboardScreen = ({
 
 const ChatScreen = ({
   callAlfred,
+  debugMode,
 }: {
-  callAlfred?: (msg: string) => Promise<string>;
+  callAlfred?: (msg: string) => Promise<{ text: string; thought?: string }>;
+  debugMode?: boolean;
 }) => {
   const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
   const [inputValue, setInputValue] = useState('');
@@ -475,9 +478,12 @@ const ChatScreen = ({
     setIsTyping(true);
 
     let replyText = "Acknowledged. I mapped this to your current priorities and prepared the next action.";
+    let replyThought: string | undefined;
     if (callAlfred) {
       try {
-        replyText = await callAlfred(newUserMsg.text);
+        const response = await callAlfred(newUserMsg.text);
+        replyText = response.text;
+        replyThought = response.thought;
       } catch {
         replyText = "I encountered an issue connecting to Alfred. Please check your connection.";
       }
@@ -487,6 +493,7 @@ const ChatScreen = ({
       id: (Date.now() + 1).toString(),
       sender: 'alfred',
       text: replyText,
+      thought: replyThought,
       timestamp: new Date()
     };
     setMessages(prev => [...prev, alfredMsg]);
@@ -516,10 +523,18 @@ const ChatScreen = ({
             <div className={`max-w-[80%] flex gap-3 ${msg.sender === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
               {msg.sender === 'alfred' && <AlfredMonogram />}
               <div className={`p-4 rounded-2xl text-sm leading-relaxed shadow-sm ${
-                msg.sender === 'user' 
-                  ? 'bg-navy text-white rounded-tr-none' 
+                msg.sender === 'user'
+                  ? 'bg-navy text-white rounded-tr-none'
                   : 'bg-white/75 text-charcoal rounded-tl-none'
               }`}>
+                {debugMode && msg.sender === 'alfred' && msg.thought && (
+                  <details className="mb-2 text-xs opacity-70 border-b border-current/10 pb-2">
+                    <summary className="cursor-pointer text-[10px] uppercase tracking-widest font-bold mb-1">💭 Thought</summary>
+                    <pre className="whitespace-pre-wrap break-all text-[10px] leading-relaxed max-h-40 overflow-y-auto">
+                      {(() => { try { return atob(msg.thought || ''); } catch { return msg.thought || ''; } })()}
+                    </pre>
+                  </details>
+                )}
                 {msg.text}
               </div>
             </div>
@@ -763,6 +778,7 @@ const ConnectBanner = ({
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
+  const [debugMode] = useState(() => new URLSearchParams(window.location.search).has('debug'));
   const [profile, setProfile] = useState<UserProfile>({
     name: 'Bruce',
     role: 'Principal',
@@ -822,9 +838,9 @@ export default function App() {
   }, [auth.token, auth.email, auth.sessionId, auth.loading]);
 
   // ─── callAlfred helper ───────────────────────────────────────────────────────
-  const callAlfred = useCallback(async (msg: string): Promise<string> => {
+  const callAlfred = useCallback(async (msg: string): Promise<{ text: string; thought?: string }> => {
     if (!auth.sessionId || !auth.email) {
-      return "Please connect your Google account first to use Alfred's live features.";
+      return { text: "Please connect your Google account first to use Alfred's live features." };
     }
     return sendToAlfred(auth.email, auth.sessionId, msg);
   }, [auth.email, auth.sessionId]);
@@ -845,7 +861,7 @@ export default function App() {
     setAlfredReply('');
     setAlfredLoading(true);
     try {
-      const reply = await callAlfred(
+      const { text: reply } = await callAlfred(
         `Please reschedule "${event.title}" on ${event.day} at ${event.time}. Find the next available free slot in the next 7 days and update the calendar.`
       );
       setAlfredReply(reply);
@@ -863,7 +879,7 @@ export default function App() {
     setAlfredReply('');
     setAlfredLoading(true);
     try {
-      const reply = await callAlfred(
+      const { text: reply } = await callAlfred(
         `Send a reminder email for "${event.title}" on ${event.day} at ${event.time}${event.location ? ` at ${event.location}` : ''}. ${emails ? `Recipients: ${emails}.` : ''} Keep it brief and professional.`
       );
       setAlfredReply(reply);
@@ -879,7 +895,7 @@ export default function App() {
     setAlfredReply('');
     setAlfredLoading(true);
     try {
-      const reply = await callAlfred(
+      const { text: reply } = await callAlfred(
         `Block 1 hour of focus time before "${event.title}" on ${event.day} at ${event.time}. Mark it as busy and add a note saying it's pre-${event.title} prep time.`
       );
       setAlfredReply(reply);
@@ -898,7 +914,7 @@ export default function App() {
     setDashboardLoading(true);
     setDashboardReply('');
     try {
-      const reply = await callAlfred(msg);
+      const { text: reply } = await callAlfred(msg);
       setDashboardReply(reply);
     } catch {
       setDashboardReply('Alfred could not respond at this moment.');
@@ -952,7 +968,7 @@ export default function App() {
             dashboardReply={dashboardReply}
           />
         );
-      case 'chat': return <ChatScreen callAlfred={callAlfred} />;
+      case 'chat': return <ChatScreen callAlfred={callAlfred} debugMode={debugMode} />;
       case 'contacts': return <ContactsScreen contacts={contacts} onAdd={addContact} />;
       case 'profile': return <ProfileScreen profile={profile} setProfile={setProfile} actionLog={actionLog} />;
       default: return null;

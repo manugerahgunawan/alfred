@@ -663,6 +663,10 @@ def _token_record_from_state(state: Any) -> dict[str, Any]:
         return {}
 
     access_token = str(state.get(SESSION_ACCESS_TOKEN_KEY, "")).strip()
+    _debug_trace(
+        f"[Auth] _token_record_from_state called with state_keys={list(state.keys()) if isinstance(state, dict) else 'not-a-dict'} "
+        f"has_access_token={bool(access_token)} token_len={len(access_token)}"
+    )
     if not access_token:
         return {}
 
@@ -762,10 +766,17 @@ class SessionAwareCredentialService(BaseCredentialService):
         session_id = getattr(session, "id", "") if session is not None else ""
         session_state = getattr(session, "state", {}) if session is not None else {}
 
+        _debug_trace(
+            f"[CredentialService] load_credential called app={app_name or '<missing>'} user={user_id or '<missing>'} session={session_id or '<missing>'} "
+            f"session_state_keys={list(session_state.keys()) if isinstance(session_state, dict) else 'not-a-dict'} "
+            f"store_keys={list(SESSION_TOKEN_STORE.keys())[:5]}"
+        )
+
         record = _get_token_record(app_name, user_id, session_id)
         if not record:
             record = _token_record_from_state(session_state)
         if not record:
+            _debug_trace(f"[CredentialService] No token record found for session={session_id}")
             return None
         record = _refresh_token_record(app_name, user_id, session_id, record)
 
@@ -876,6 +887,17 @@ class SessionAwareMcpToolset(McpToolset):
             f"auth_scheme={getattr(getattr(self, '_auth_scheme', None), 'scheme', '<missing>')} "
             f"auth_header_len={auth_header_len}"
         )
+
+        # Build auth credential from resolved token so MCPTool instances have it
+        # at construction time and ADK never needs to fire adk_request_credential.
+        auth_credential: Optional[AuthCredential] = None
+        if headers:
+            raw_auth = headers.get("Authorization", "")
+            token = raw_auth.removeprefix("Bearer ").strip() if raw_auth.startswith("Bearer ") else ""
+            if token:
+                auth_credential = _build_bearer_credential(token)
+                _debug_trace(f"[MCP] Built auth_credential from resolved token token_len={len(token)}")
+
         try:
             _debug_trace(
                 "[MCP] About to create MCP session "
@@ -902,7 +924,7 @@ class SessionAwareMcpToolset(McpToolset):
                 mcp_tool=tool,
                 mcp_session_manager=self._mcp_session_manager,
                 auth_scheme=self._auth_scheme,
-                auth_credential=None,
+                auth_credential=auth_credential,
             )
 
             if self._is_tool_selected(mcp_tool, readonly_context):

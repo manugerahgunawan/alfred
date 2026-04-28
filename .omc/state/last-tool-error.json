@@ -1,7 +1,7 @@
 {
-  "tool_name": "mcp__gcloud__run_gcloud_command",
-  "tool_input_preview": "{\"args\":[\"run\",\"revisions\",\"logs\",\"alfred-agent-00034-9xp\",\"--service=alfred-agent\",\"--region=asia-southeast2\",\"--project=alfred-492407\",\"--limit=30\"]}",
-  "error": "UnrecognizedCommandError: Invalid choice: 'logs'",
-  "timestamp": "2026-04-28T09:52:46.725Z",
-  "retry_count": 4
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"gh pr create --repo luiz-ramelan/alfred --base main --head feature/morefunctions --title \\\"feat: ADK initialization fix\\\" --body \\\"$(cat <<'EOF'\\n## Summary\\n- Fixes ADK initialization fai...",
+  "error": "Exit code 127\n/usr/bin/bash: line 9: gh: command not found",
+  "timestamp": "2026-04-28T13:30:56.778Z",
+  "retry_count": 1
 }
