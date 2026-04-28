@@ -839,11 +839,11 @@ export default function App() {
 
   // ─── callAlfred helper ───────────────────────────────────────────────────────
   const callAlfred = useCallback(async (msg: string): Promise<{ text: string; thought?: string }> => {
-    if (!auth.sessionId || !auth.email) {
+    if (!auth.sessionId || !auth.email || !auth.token) {
       return { text: "Please connect your Google account first to use Alfred's live features." };
     }
-    return sendToAlfred(auth.email, auth.sessionId, msg);
-  }, [auth.email, auth.sessionId]);
+    return sendToAlfred(auth.email, auth.sessionId, auth.token, msg);
+  }, [auth.email, auth.sessionId, auth.token]);
 
   // ─── Logging ─────────────────────────────────────────────────────────────────
   const addLog = (entry: string) => {

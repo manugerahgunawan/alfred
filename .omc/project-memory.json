@@ -183,16 +183,16 @@
       "type": "file"
     },
     {
+      "path": ".env",
+      "accessCount": 2,
+      "lastAccessed": 1777395278931,
+      "type": "file"
+    },
+    {
       "path": "src",
       "accessCount": 1,
       "lastAccessed": 1777366069395,
       "type": "directory"
-    },
-    {
-      "path": ".env",
-      "accessCount": 1,
-      "lastAccessed": 1777366072979,
-      "type": "file"
     },
     {
       "path": ".env.example",

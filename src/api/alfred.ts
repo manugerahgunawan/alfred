@@ -65,7 +65,10 @@ export async function createAlfredSession(
     `${ALFRED_BASE_URL}/apps/${APP_NAME}/users/${encodeURIComponent(userId).replace('%40', '@')}/sessions`,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
       body: JSON.stringify({
         state: {
           ALFRED_ACCESS_TOKEN: accessToken,
@@ -99,18 +102,22 @@ export interface AlfredResponse {
 export async function sendToAlfred(
   userId: string,
   sessionId: string,
+  accessToken: string,
   message: string
 ): Promise<AlfredResponse> {
   const res = await fetch(
     `${ALFRED_BASE_URL}/run`,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
       body: JSON.stringify({
-        appName: APP_NAME,
-        userId,
-        sessionId,
-        newMessage: {
+        app_name: APP_NAME,
+        user_id: userId,
+        session_id: sessionId,
+        new_message: {
           role: 'user',
           parts: [{ text: message }],
         },

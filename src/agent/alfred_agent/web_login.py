@@ -8,7 +8,7 @@ from pathlib import Path
 from urllib.parse import urlencode
 import requests as http_requests
 from fastapi import FastAPI, Request, Response, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 import uvicorn
 import google.adk.cli.fast_api as adk_fast_api
 from google.adk.cli.adk_web_server import AdkWebServer
@@ -110,6 +110,16 @@ def _parse_int_cookie(value: str | None) -> int | None:
 
 def _read_cookie_text(value: str | None) -> str:
     return (value or "").strip()
+
+
+def _read_bearer_token(request: Request) -> str:
+    authorization = _read_cookie_text(request.headers.get("authorization"))
+    if not authorization:
+        return ""
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer":
+        return ""
+    return token.strip()
 
 
 async def _latest_session_redirect_url() -> str:
@@ -292,6 +302,9 @@ async def gatekeeper_middleware(request: Request, call_next):
     if request.url.path.startswith("/public/") or request.url.path.startswith("/gatekeeper-assets"):
         return await call_next(request)
 
+    if request.method == "OPTIONS":
+        return await call_next(request)
+
     # Check for session token cookie
     token = request.cookies.get("alfred_token")
     refresh_token = request.cookies.get("alfred_refresh_token")
@@ -299,7 +312,11 @@ async def gatekeeper_middleware(request: Request, call_next):
     user_timezone = _read_cookie_text(request.cookies.get("alfred_timezone"))
     user_locale = _read_cookie_text(request.cookies.get("alfred_locale"))
     if not token:
+        token = _read_bearer_token(request)
+    if not token:
         logger.info(f"[Gatekeeper] Unauthorized: {request.url.path} → redirecting to /")
+        if request.url.path.startswith(("/run", "/run_sse", "/run_live", "/apps/")):
+            return JSONResponse(status_code=401, content={"detail": "Authentication required."})
         return RedirectResponse(url="/")
 
     # Inject per-request OAuth2 access token into context
