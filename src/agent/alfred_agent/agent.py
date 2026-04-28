@@ -35,7 +35,7 @@ from google.auth.transport.requests import Request as GoogleAuthRequest
 from google.oauth2.credentials import Credentials as GoogleOAuthCredentials
 from google.genai.types import FunctionDeclaration
 
-from mcp_google_client import MCPGoogleClient
+from .mcp_google_client import MCPGoogleClient
 
 # --- Per-Request Authentication Context ---
 # This ensures that each user has their own isolated session and token.
