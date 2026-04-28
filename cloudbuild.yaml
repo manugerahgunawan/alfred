@@ -3,7 +3,7 @@ steps:
     args:
       - build
       - '--build-arg'
-      - 'VITE_GOOGLE_CLIENT_ID=$_VITE_GOOGLE_CLIENT_ID'
+      - 'VITE_GOOGLE_OAUTH_CLIENT_ID=$_VITE_GOOGLE_OAUTH_CLIENT_ID'
       - '--build-arg'
       - 'VITE_ALFRED_BASE_URL=$_VITE_ALFRED_BASE_URL'
       - '-t'

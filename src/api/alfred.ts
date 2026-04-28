@@ -4,14 +4,14 @@
  * INTEGRATION REQUIREMENTS:
  *  1. CORS: The Cloud Run backend must allow requests from this origin.
  *     Add CORS middleware to the ADK server, or configure via Cloud Run / load-balancer headers.
- *  2. VITE_GOOGLE_CLIENT_ID: Add your OAuth client ID to .env so the auth flow works.
- *     e.g.  VITE_GOOGLE_CLIENT_ID=123456789.apps.googleusercontent.com
+ *  2. VITE_GOOGLE_OAUTH_CLIENT_ID: Add your OAuth client ID to .env so the auth flow works.
+ *     e.g.  VITE_GOOGLE_OAUTH_CLIENT_ID=123456789.apps.googleusercontent.com
  *     The redirect URI (window.location.origin) must be registered in GCP Console.
  */
 
 export const ALFRED_BASE_URL =
   (import.meta as unknown as { env: Record<string, string> }).env
-    .VITE_ALFRED_BASE_URL ?? 'https://alfredagent-181562945855.asia-southeast1.run.app';
+    .VITE_ALFRED_BASE_URL || 'https://alfredagent-181562945855.asia-southeast1.run.app';
 
 const APP_NAME = 'alfred_agent';
 
@@ -44,7 +44,7 @@ export async function createAlfredSession(
   timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Bangkok'
 ): Promise<string> {
   const res = await fetch(
-    `${ALFRED_BASE_URL}/apps/${APP_NAME}/users/${encodeURIComponent(userId)}/sessions/`,
+    `${ALFRED_BASE_URL}/apps/${APP_NAME}/users/${encodeURIComponent(userId)}/sessions`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -79,7 +79,7 @@ export async function sendToAlfred(
   message: string
 ): Promise<string> {
   const res = await fetch(
-    `${ALFRED_BASE_URL}/apps/${APP_NAME}/users/${encodeURIComponent(userId)}/sessions/${encodeURIComponent(sessionId)}/run/`,
+    `${ALFRED_BASE_URL}/apps/${APP_NAME}/users/${encodeURIComponent(userId)}/sessions/${encodeURIComponent(sessionId)}/run`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -167,14 +167,14 @@ const GOOGLE_SCOPES = [
  * Redirects to Google OAuth implicit flow. On return, `parseOAuthFragment()`
  * should be called to extract the access token from the URL hash.
  *
- * Requires VITE_GOOGLE_CLIENT_ID to be set in .env
+ * Requires VITE_GOOGLE_OAUTH_CLIENT_ID to be set in .env
  */
 export function startGoogleOAuth(): void {
   const clientId = (import.meta as unknown as { env: Record<string, string> }).env
-    .VITE_GOOGLE_CLIENT_ID;
+    .VITE_GOOGLE_OAUTH_CLIENT_ID;
   if (!clientId) {
     throw new Error(
-      'VITE_GOOGLE_CLIENT_ID is not set. Add it to your .env file to enable Google sign-in.'
+      'VITE_GOOGLE_OAUTH_CLIENT_ID is not set. Add it to your .env file to enable Google sign-in.'
     );
   }
   const params = new URLSearchParams({

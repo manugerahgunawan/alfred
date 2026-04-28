@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__gcloud__run_gcloud_command"
+    ]
+  }
+}
